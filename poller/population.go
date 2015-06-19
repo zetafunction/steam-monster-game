@@ -4,25 +4,26 @@ import "encoding/json"
 import "time"
 import "sort"
 import "log"
+import "github.com/zetafunction/steam-monster-game/steam"
 
 // TODO: Remember where the search started previously.
 const searchStart = 47000
 
-func findGameIndex(start int) (int, error) {
+func findGameIndex(service *steam.ApiService, start int) (int, error) {
 	log.Print("Searching for invalid games starting at game ", start)
 	lastValid := -1
 	lastInvalid := -1
 	// Probe around the starting index to find a range to binary search over.
 	for i, inc := start, 1; ; i, inc = i+inc, inc*2 {
 		log.Print("Probing game ", i)
-		response, err := getGameData(i)
-		if err != nil {
+		reply := <-service.GetGameData(i)
+		if reply.Err != nil {
 			// TODO: This should be more robust.
-			log.Print("getGameData failed: ", err)
-			return 0, err
+			log.Print("GetGameData failed: ", reply.Err)
+			return 0, reply.Err
 		}
-		switch response.GameData.Status {
-		case gameStatusInvalid:
+		switch reply.GameData.Status {
+		case steam.GameStatusInvalid:
 			lastInvalid = i
 			if lastValid == -1 {
 				log.Print("Initial index was invalid: searching downwards!")
@@ -35,16 +36,14 @@ func findGameIndex(start int) (int, error) {
 		if lastValid != -1 && lastInvalid != -1 {
 			break
 		}
-		time.Sleep(time.Millisecond * 250)
 	}
 	log.Printf("Binary searching between valid game at %d and invalid game at %d\n", lastValid, lastInvalid)
 	// Strictly speaking, a binary search is a bit dangerous because things might change.
 	// Hopefully it returns close enough to the right result.
 	invalidOffset := sort.Search(lastInvalid-lastValid+1, func(i int) bool {
 		// TODO: Panic?
-		r, _ := getGameData(lastValid + i)
-		time.Sleep(time.Millisecond * 250)
-		return r.GameData.Status == gameStatusInvalid
+		reply := <-service.GetGameData(lastValid + i)
+		return reply.GameData.Status == steam.GameStatusInvalid
 	})
 	return lastValid + invalidOffset, nil
 }
@@ -59,29 +58,29 @@ type gameDataPoller struct {
 	flex int
 }
 
-func (p *gameDataPoller) updateData() ([]byte, error) {
+func (p *gameDataPoller) updateData(service *steam.ApiService) ([]byte, error) {
 	log.Printf("Updating data (invalid: %d, flex: %d)\n", p.invalid, p.flex)
 	start := p.invalid - 25 - p.flex
 	end := p.invalid + 5
 
 	type update struct {
 		id    int
-		reply *gameDataReply
+		reply *steam.GameDataReply
 	}
 	c := make(chan update)
 	requests := 0
 	failed := 0
 	for i := start; i < end; i++ {
 		go func(i int) {
-			reply, err := getGameData(i)
-			if err != nil {
+			reply := <-service.GetGameData(i)
+			if reply.Err != nil {
 				failed++
 			}
 			c <- update{i, reply}
 		}(i)
 		requests++
 	}
-	m := make(map[int]*gameDataReply)
+	m := make(map[int]*steam.GameDataReply)
 	for requests > 0 {
 		update := <-c
 		m[update.id] = update.reply
@@ -104,19 +103,19 @@ func (p *gameDataPoller) updateData() ([]byte, error) {
 		}
 		var status string
 		switch m[i].GameData.Status {
-		case gameStatusInvalid:
+		case steam.GameStatusInvalid:
 			if i < firstInvalid {
 				firstInvalid = i
 			}
 			status = "invalid"
-		case gameStatusRunning:
+		case steam.GameStatusRunning:
 			status = "running"
-		case gameStatusWaiting:
+		case steam.GameStatusWaiting:
 			if i < firstWaiting {
 				firstWaiting = i
 			}
 			status = "waiting"
-		case gameStatusEnded:
+		case steam.GameStatusEnded:
 			status = "ended"
 		}
 		results = append(results, statusEntry{i, status, m[i].Stats.NumPlayers})
@@ -136,8 +135,8 @@ func (p *gameDataPoller) updateData() ([]byte, error) {
 	return json.Marshal(results)
 }
 
-func Start() (<-chan []byte, error) {
-	invalid, err := findGameIndex(searchStart)
+func Start(service *steam.ApiService) (<-chan []byte, error) {
+	invalid, err := findGameIndex(service, searchStart)
 	if err != nil {
 		log.Print("findGameIndices failed: ", err)
 		return nil, err
@@ -150,7 +149,7 @@ func Start() (<-chan []byte, error) {
 			t := time.NewTimer(time.Second)
 			select {
 			case <-t.C:
-				if json, err := p.updateData(); err == nil {
+				if json, err := p.updateData(service); err == nil {
 					c <- json
 				} else {
 					log.Print("updateData failed: ", err)

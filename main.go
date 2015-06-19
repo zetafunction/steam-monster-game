@@ -4,11 +4,13 @@ import "io"
 import "log"
 import "net/http"
 import "github.com/zetafunction/steam-monster-game/poller"
+import "github.com/zetafunction/steam-monster-game/steam"
 
 func main() {
-	log.Print("Performing initial data update...")
+	service := steam.NewApiService()
 
-	dataUpdate, err := poller.Start()
+	log.Print("Performing initial data update...")
+	dataUpdate, err := poller.Start(service)
 	if err != nil {
 		log.Fatal("Unable to start game poller:", err)
 	}
@@ -21,6 +23,14 @@ func main() {
 	http.HandleFunc("/steam-monster-game/new-game-poller",
 		func(w http.ResponseWriter, req *http.Request) {
 			http.ServeFile(w, req, "index2.html")
+		})
+	http.HandleFunc("/steam-monster-game/stats",
+		func(w http.ResponseWriter, req *http.Request) {
+			http.ServeFile(w, req, "stats.html")
+		})
+	http.HandleFunc("/steam-monster-game/new-stats",
+		func(w http.ResponseWriter, req *http.Request) {
+			http.ServeFile(w, req, "stats2.html")
 		})
 	http.HandleFunc("/steam-monster-game/game-poller-data.json",
 		func(w http.ResponseWriter, req *http.Request) {
