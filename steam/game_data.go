@@ -1,58 +1,45 @@
 package steam
 
-import "encoding/json"
-import "fmt"
-import "io/ioutil"
-import "net/http"
-import "log"
-
-const gameDataURL = "http://steamapi-a.akamaihd.net/ITowerAttackMiniGameService/GetGameData/v0001/?gameid=%d&include_stats=1&format=json"
-
-// See the definition of EMiniGameStatus in
-// http://cdn.akamai.steamstatic.com/steamcommunity/public/assets/minigame/towerattack/messages.proto
-const (
-	GameStatusInvalid = iota
-	GameStatusWaiting
-	GameStatusRunning
-	GameStatusEnded
+import (
+	"fmt"
+	"github.com/golang/protobuf/proto"
+	"github.com/zetafunction/steam-monster-game/messages"
+	"io/ioutil"
+	"log"
+	"net/http"
 )
 
-type GameDataReply struct {
-	GameData struct {
-		Status int
-	} `json:"game_data"`
-	Stats struct {
-		NumPlayers int `json:"num_players"`
-	}
-	Err error
+const gameDataURL = "http://steamapi-a.akamaihd.net/ITowerAttackMiniGameService/GetGameData/v0001/?gameid=%d&include_stats=1&format=protobuf_raw"
+
+type GameDataResult struct {
+	Response *messages.CTowerAttack_GetGameData_Response
+	Err      error
 }
 
-func (s *ApiService) GetGameData(id int) <-chan *GameDataReply {
-	c := make(chan *GameDataReply)
+func (s *ApiService) GetGameData(id int) <-chan *GameDataResult {
+	c := make(chan *GameDataResult)
 	s.request <- func() {
-		var response struct {
-			Response GameDataReply
-		}
 		resp, err := http.Get(fmt.Sprintf(gameDataURL, id))
 		if err != nil {
-			log.Printf("Get failed: ", err)
-			c <- &GameDataReply{Err: err}
+			log.Print("Get failed: ", err)
+			c <- &GameDataResult{Err: err}
 			return
 		}
 		defer resp.Body.Close()
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			log.Printf("ReadAll failed: ", err)
-			c <- &GameDataReply{Err: err}
+			log.Print("ReadAll failed: ", err)
+			c <- &GameDataResult{Err: err}
 			return
 		}
-		if err := json.Unmarshal(body, &response); err != nil {
-			log.Println("Unmarshal failed:", err)
-			log.Printf("Response for %d was %s", id, body)
-			c <- &GameDataReply{Err: err}
+		response := &messages.CTowerAttack_GetGameData_Response{}
+		if err := proto.Unmarshal(body, response); err != nil {
+			log.Print("Unmarshal failed:", err)
+			log.Print("Response for ", id, " was ", body[:64])
+			c <- &GameDataResult{Err: err}
 			return
 		}
-		c <- &response.Response
+		c <- &GameDataResult{Response: response}
 	}
 	return c
 }

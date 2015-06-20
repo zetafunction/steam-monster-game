@@ -1,10 +1,13 @@
 package poller
 
-import "encoding/json"
-import "time"
-import "sort"
-import "log"
-import "github.com/zetafunction/steam-monster-game/steam"
+import (
+	"encoding/json"
+	"github.com/zetafunction/steam-monster-game/messages"
+	"github.com/zetafunction/steam-monster-game/steam"
+	"log"
+	"sort"
+	"time"
+)
 
 // TODO: Remember where the search started previously.
 const searchStart = 47000
@@ -16,14 +19,14 @@ func findGameIndex(service *steam.ApiService, start int) (int, error) {
 	// Probe around the starting index to find a range to binary search over.
 	for i, inc := start, 1; ; i, inc = i+inc, inc*2 {
 		log.Print("Probing game ", i)
-		reply := <-service.GetGameData(i)
-		if reply.Err != nil {
+		result := <-service.GetGameData(i)
+		if result.Err != nil {
 			// TODO: This should be more robust.
-			log.Print("GetGameData failed: ", reply.Err)
-			return 0, reply.Err
+			log.Print("GetGameData failed: ", result.Err)
+			return 0, result.Err
 		}
-		switch reply.GameData.Status {
-		case steam.GameStatusInvalid:
+		switch result.Response.GetGameData().GetStatus() {
+		case messages.EMiniGameStatus_k_EMiniGameStatus_Invalid:
 			lastInvalid = i
 			if lastValid == -1 {
 				log.Print("Initial index was invalid: searching downwards!")
@@ -42,8 +45,8 @@ func findGameIndex(service *steam.ApiService, start int) (int, error) {
 	// Hopefully it returns close enough to the right result.
 	invalidOffset := sort.Search(lastInvalid-lastValid+1, func(i int) bool {
 		// TODO: Panic?
-		reply := <-service.GetGameData(lastValid + i)
-		return reply.GameData.Status == steam.GameStatusInvalid
+		result := <-service.GetGameData(lastValid + i)
+		return result.Response.GetGameData().GetStatus() == messages.EMiniGameStatus_k_EMiniGameStatus_Invalid
 	})
 	return lastValid + invalidOffset, nil
 }
@@ -64,33 +67,33 @@ func (p *gameDataPoller) updateData(service *steam.ApiService) ([]byte, error) {
 	end := p.invalid + 5
 
 	type update struct {
-		id    int
-		reply *steam.GameDataReply
+		id     int
+		result *steam.GameDataResult
 	}
 	c := make(chan update)
 	requests := 0
 	failed := 0
 	for i := start; i < end; i++ {
 		go func(i int) {
-			reply := <-service.GetGameData(i)
-			if reply.Err != nil {
+			result := <-service.GetGameData(i)
+			if result.Err != nil {
 				failed++
 			}
-			c <- update{i, reply}
+			c <- update{i, result}
 		}(i)
 		requests++
 	}
-	m := make(map[int]*steam.GameDataReply)
+	m := make(map[int]*steam.GameDataResult)
 	for requests > 0 {
 		update := <-c
-		m[update.id] = update.reply
+		m[update.id] = update.result
 		requests--
 	}
 
 	type statusEntry struct {
 		Id      int
 		Status  string
-		Players int
+		Players uint32
 	}
 	var results []statusEntry
 	firstWaiting := end
@@ -98,27 +101,31 @@ func (p *gameDataPoller) updateData(service *steam.ApiService) ([]byte, error) {
 	for i := start; i < end; i++ {
 		// Sometimes, the server likes to give out 500 errors, just because...
 		if m[i] == nil {
-			results = append(results, statusEntry{i, "???????", -1})
+			results = append(results, statusEntry{i, "???????", 0})
 			continue
 		}
 		var status string
-		switch m[i].GameData.Status {
-		case steam.GameStatusInvalid:
+		switch m[i].Response.GetGameData().GetStatus() {
+		case messages.EMiniGameStatus_k_EMiniGameStatus_Invalid:
 			if i < firstInvalid {
 				firstInvalid = i
 			}
 			status = "invalid"
-		case steam.GameStatusRunning:
+		case messages.EMiniGameStatus_k_EMiniGameStatus_Running:
 			status = "running"
-		case steam.GameStatusWaiting:
+		case messages.EMiniGameStatus_k_EMiniGameStatus_WaitingForPlayers:
 			if i < firstWaiting {
 				firstWaiting = i
 			}
 			status = "waiting"
-		case steam.GameStatusEnded:
+		case messages.EMiniGameStatus_k_EMiniGameStatus_Ended:
 			status = "ended"
 		}
-		results = append(results, statusEntry{i, status, m[i].Stats.NumPlayers})
+		results = append(results, statusEntry{
+			i,
+			status,
+			m[i].Response.GetStats().GetNumPlayers(),
+		})
 	}
 
 	// Always try to have at least one actively updated non-waiting entry.
