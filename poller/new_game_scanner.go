@@ -55,7 +55,7 @@ func findGameIndex(service *steam.APIService, start int) (int, error) {
 	return lastValid + invalidOffset, err
 }
 
-type newGameScanner struct {
+type NewGameScanner struct {
 	service *steam.APIService
 	// The first invalid game ID. This may occasionally point to a valid game, since
 	// the scanner scans 5 games ahead at a time.
@@ -65,14 +65,15 @@ type newGameScanner struct {
 	// indicates the number of extra games that need to be polled at a given point.
 	flex int
 
-	update chan []byte
+	DataUpdate        chan []byte
+	InvalidGameUpdate chan int
 }
 
-func (p *newGameScanner) start() {
+func (p *NewGameScanner) Start() {
 	go func() {
 		for {
 			if json, err := p.updateData(); err == nil {
-				p.update <- json
+				p.DataUpdate <- json
 			} else {
 				log.Print("updateData failed: ", err)
 			}
@@ -81,7 +82,7 @@ func (p *newGameScanner) start() {
 	}()
 }
 
-func (p *newGameScanner) updateData() ([]byte, error) {
+func (p *NewGameScanner) updateData() ([]byte, error) {
 	log.Printf("Updating data (invalid: %d, flex: %d)\n", p.invalid, p.flex)
 	start := p.invalid - 25 - p.flex
 	end := p.invalid + 5
@@ -162,15 +163,14 @@ func (p *newGameScanner) updateData() ([]byte, error) {
 	return json.Marshal(results)
 }
 
-func StartNewGameScanner(service *steam.APIService) (<-chan []byte, error) {
-	// TODO: This should probably be a receiver method of newGameScanner.
+func NewNewGameScanner(service *steam.APIService) (*NewGameScanner, error) {
+	// TODO: This should probably be a receiver method of NewGameScanner.
 	invalid, err := findGameIndex(service, searchStart)
 	if err != nil {
 		log.Print("findGameIndex failed: ", err)
 		return nil, err
 	}
 	log.Print("First invalid game around ", invalid)
-	p := &newGameScanner{service, invalid, 0, make(chan []byte)}
-	p.start()
-	return p.update, nil
+	p := &NewGameScanner{service, invalid, 0, make(chan []byte), make(chan int)}
+	return p, nil
 }

@@ -12,16 +12,17 @@ func main() {
 	service := steam.NewAPIService()
 
 	log.Print("Performing initial data update...")
-	dataUpdate, err := poller.StartNewGameScanner(service)
+	newGameScanner, err := poller.NewNewGameScanner(service)
 	if err != nil {
-		log.Fatal("Unable to start game poller:", err)
+		log.Fatal("NewNewGameScanner failed: ", err)
 	}
+	newGameScanner.Start()
 
-	dataRequests := make(chan chan []byte, 50)
+	newGameScannerRequests := make(chan chan []byte, 50)
 	http.HandleFunc("/new-game-scanner-data.json",
 		func(w http.ResponseWriter, req *http.Request) {
 			request := make(chan []byte)
-			dataRequests <- request
+			newGameScannerRequests <- request
 			json := <-request
 			io.WriteString(w, string(json))
 		})
@@ -31,12 +32,12 @@ func main() {
 			log.Fatal("ListenAndServe: ", err)
 		}
 	}()
-	var json []byte
+	var newGameScannerData []byte
 	for {
 		select {
-		case json = <-dataUpdate:
-		case req := <-dataRequests:
-			req <- json
+		case newGameScannerData = <-newGameScanner.DataUpdate:
+		case req := <-newGameScannerRequests:
+			req <- newGameScannerData
 		}
 	}
 }
