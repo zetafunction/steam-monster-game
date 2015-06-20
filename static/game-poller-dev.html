@@ -86,7 +86,7 @@ function getUpdateFromServer() {
     }
     window.setTimeout(getUpdateFromServer, 1000);
   };
-  xhr.open('get', 'game-poller-data.json', true);
+  xhr.open('get', 'service/game-poller-data.json', true);
   xhr.responseType = 'json';
   xhr.send();
 }

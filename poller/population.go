@@ -135,7 +135,7 @@ func (p *gameDataPoller) updateData(service *steam.ApiService) ([]byte, error) {
 	return json.Marshal(results)
 }
 
-func Start(service *steam.ApiService) (<-chan []byte, error) {
+func StartGamePoller(service *steam.ApiService) (<-chan []byte, error) {
 	invalid, err := findGameIndex(service, searchStart)
 	if err != nil {
 		log.Print("findGameIndices failed: ", err)
