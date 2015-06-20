@@ -1,13 +1,15 @@
 package main
 
-import "io"
-import "log"
-import "net/http"
-import "github.com/zetafunction/steam-monster-game/poller"
-import "github.com/zetafunction/steam-monster-game/steam"
+import (
+	"github.com/zetafunction/steam-monster-game/poller"
+	"github.com/zetafunction/steam-monster-game/steam"
+	"io"
+	"log"
+	"net/http"
+)
 
 func main() {
-	service := steam.NewApiService()
+	service := steam.NewAPIService()
 
 	log.Print("Performing initial data update...")
 	dataUpdate, err := poller.StartNewGameScanner(service)

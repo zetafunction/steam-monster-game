@@ -16,7 +16,7 @@ type GameDataResult struct {
 	Err      error
 }
 
-func (s *ApiService) GetGameData(id int) <-chan *GameDataResult {
+func (s *APIService) GetGameData(id int) <-chan *GameDataResult {
 	c := make(chan *GameDataResult)
 	s.request <- func() {
 		resp, err := http.Get(fmt.Sprintf(gameDataURL, id))

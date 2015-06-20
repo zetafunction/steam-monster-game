@@ -7,7 +7,7 @@ const (
 	maxRequestsPerSecond = 100
 )
 
-type ApiService struct {
+type APIService struct {
 	// Limiters for requests in flight and requests per second.
 	inFlight  chan struct{}
 	perSecond chan struct{}
@@ -18,7 +18,7 @@ type ApiService struct {
 	quit chan struct{}
 }
 
-func (s *ApiService) Start() {
+func (s *APIService) Start() {
 	fillBucket(s.inFlight, maxRequestsInFlight)
 	fillBucket(s.perSecond, maxRequestsPerSecond)
 	t := time.NewTicker(time.Second)
@@ -47,7 +47,7 @@ func fillBucket(c chan<- struct{}, n int) {
 	}
 }
 
-func (s *ApiService) dispatchPendingRequests() {
+func (s *APIService) dispatchPendingRequests() {
 	for len(s.pendingRequests) > 0 {
 		select {
 		case <-s.inFlight:
@@ -69,12 +69,12 @@ func (s *ApiService) dispatchPendingRequests() {
 	}
 }
 
-func (s *ApiService) Stop() {
+func (s *APIService) Stop() {
 	close(s.quit)
 }
 
-func NewApiService() *ApiService {
-	service := &ApiService{
+func NewAPIService() *APIService {
+	service := &APIService{
 		inFlight:  make(chan struct{}, maxRequestsInFlight),
 		perSecond: make(chan struct{}, maxRequestsPerSecond),
 		request:   make(chan func()),

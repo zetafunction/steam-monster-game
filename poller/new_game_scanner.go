@@ -12,7 +12,7 @@ import (
 // TODO: Remember where the search started previously.
 const searchStart = 47000
 
-func findGameIndex(service *steam.ApiService, start int) (int, error) {
+func findGameIndex(service *steam.APIService, start int) (int, error) {
 	log.Print("Searching for invalid games starting at game ", start)
 	lastValid := -1
 	lastInvalid := -1
@@ -56,7 +56,7 @@ func findGameIndex(service *steam.ApiService, start int) (int, error) {
 }
 
 type newGameScanner struct {
-	service *steam.ApiService
+	service *steam.APIService
 	// The first invalid game ID. This may occasionally point to a valid game, since
 	// the scanner scans 5 games ahead at a time.
 	invalid int
@@ -111,7 +111,7 @@ func (p *newGameScanner) updateData() ([]byte, error) {
 	}
 
 	type statusEntry struct {
-		Id      int
+		ID      int
 		Status  string
 		Players uint32
 	}
@@ -162,7 +162,8 @@ func (p *newGameScanner) updateData() ([]byte, error) {
 	return json.Marshal(results)
 }
 
-func StartNewGameScanner(service *steam.ApiService) (<-chan []byte, error) {
+func StartNewGameScanner(service *steam.APIService) (<-chan []byte, error) {
+	// TODO: This should probably be a receiver method of newGameScanner.
 	invalid, err := findGameIndex(service, searchStart)
 	if err != nil {
 		log.Print("findGameIndex failed: ", err)

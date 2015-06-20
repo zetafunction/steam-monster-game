@@ -1,7 +1,9 @@
 package main
 
-import "log"
-import "net/http"
+import (
+	"log"
+	"net/http"
+)
 
 func main() {
 	http.HandleFunc("/game-poller",
