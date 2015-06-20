@@ -43,25 +43,45 @@ func findGameIndex(service *steam.ApiService, start int) (int, error) {
 	log.Printf("Binary searching between valid game at %d and invalid game at %d\n", lastValid, lastInvalid)
 	// Strictly speaking, a binary search is a bit dangerous because things might change.
 	// Hopefully it returns close enough to the right result.
+	var err error
 	invalidOffset := sort.Search(lastInvalid-lastValid+1, func(i int) bool {
 		// TODO: Panic?
 		result := <-service.GetGameData(lastValid + i)
+		if result.Err != nil {
+			err = result.Err
+		}
 		return result.Response.GetGameData().GetStatus() == messages.EMiniGameStatus_k_EMiniGameStatus_Invalid
 	})
-	return lastValid + invalidOffset, nil
+	return lastValid + invalidOffset, err
 }
 
-type gameDataPoller struct {
+type newGameScanner struct {
+	service *steam.ApiService
 	// The first invalid game ID. This may occasionally point to a valid game, since
-	// the poller scans 5 games ahead at a time.
+	// the scanner scans 5 games ahead at a time.
 	invalid int
-	// If there are a lot of games in the waiting state, the game data poller
+	// If there are a lot of games in the waiting state, the new game scanner
 	// sometimes has to temporarily increase the number of games to poll. The flex count
 	// indicates the number of extra games that need to be polled at a given point.
 	flex int
+
+	update chan []byte
 }
 
-func (p *gameDataPoller) updateData(service *steam.ApiService) ([]byte, error) {
+func (p *newGameScanner) start() {
+	go func() {
+		for {
+			if json, err := p.updateData(); err == nil {
+				p.update <- json
+			} else {
+				log.Print("updateData failed: ", err)
+			}
+			time.Sleep(time.Second)
+		}
+	}()
+}
+
+func (p *newGameScanner) updateData() ([]byte, error) {
 	log.Printf("Updating data (invalid: %d, flex: %d)\n", p.invalid, p.flex)
 	start := p.invalid - 25 - p.flex
 	end := p.invalid + 5
@@ -75,7 +95,7 @@ func (p *gameDataPoller) updateData(service *steam.ApiService) ([]byte, error) {
 	failed := 0
 	for i := start; i < end; i++ {
 		go func(i int) {
-			result := <-service.GetGameData(i)
+			result := <-p.service.GetGameData(i)
 			if result.Err != nil {
 				failed++
 			}
@@ -142,27 +162,14 @@ func (p *gameDataPoller) updateData(service *steam.ApiService) ([]byte, error) {
 	return json.Marshal(results)
 }
 
-func StartGamePoller(service *steam.ApiService) (<-chan []byte, error) {
+func StartNewGameScanner(service *steam.ApiService) (<-chan []byte, error) {
 	invalid, err := findGameIndex(service, searchStart)
 	if err != nil {
-		log.Print("findGameIndices failed: ", err)
+		log.Print("findGameIndex failed: ", err)
 		return nil, err
 	}
 	log.Print("First invalid game around ", invalid)
-	p := &gameDataPoller{invalid, 0}
-	c := make(chan []byte)
-	go func() {
-		for {
-			t := time.NewTimer(time.Second)
-			select {
-			case <-t.C:
-				if json, err := p.updateData(service); err == nil {
-					c <- json
-				} else {
-					log.Print("updateData failed: ", err)
-				}
-			}
-		}
-	}()
-	return c, nil
+	p := &newGameScanner{service, invalid, 0, make(chan []byte)}
+	p.start()
+	return p.update, nil
 }

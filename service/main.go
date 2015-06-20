@@ -10,7 +10,7 @@ func main() {
 	service := steam.NewApiService()
 
 	log.Print("Performing initial data update...")
-	dataUpdate, err := poller.StartGamePoller(service)
+	dataUpdate, err := poller.StartNewGameScanner(service)
 	if err != nil {
 		log.Fatal("Unable to start game poller:", err)
 	}
