@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+<title>New Game Scanner</title>
 <link href='https://fonts.googleapis.com/css?family=Roboto' rel='stylesheet' type='text/css'>
 <script src='https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.5/d3.min.js' charset='utf-8'></script>
 <style>
@@ -26,7 +27,7 @@ var popHistory = {};
 function updateTable(data) {
   data = data.reverse();
   var rows = gameTable.selectAll('tr')
-    .data(data, function(d) { return d.Id; })
+    .data(data, function(d) { return d.ID; })
 
   rows.enter()
     .append('tr');
@@ -45,16 +46,16 @@ function updateTable(data) {
     .data(function(row) {
         // TODO: Figure out if there's a way to merge the pre-existing datum with the new datum.
         // For now, save the history locally.
-        if (row.Id in popHistory) {
-          popHistory[row.Id].push(row.Players);
-          if (popHistory[row.Id].length > 100)
-            popHistory[row.Id].shift();
+        if (row.ID in popHistory) {
+          popHistory[row.ID].push(row.Players);
+          if (popHistory[row.ID].length > 100)
+            popHistory[row.ID].shift();
         } else {
-          popHistory[row.Id] = [row.Players];
+          popHistory[row.ID] = [row.Players];
         }
-        var delta5s = row.Players - popHistory[row.Id][Math.max(0, popHistory[row.Id].length - 5)];
-        var delta10s = row.Players - popHistory[row.Id][Math.max(0, popHistory[row.Id].length - 10)];
-        return [row.Id, row.Status, row.Players, delta5s, delta10s];
+        var delta5s = row.Players - popHistory[row.ID][Math.max(0, popHistory[row.ID].length - 5)];
+        var delta10s = row.Players - popHistory[row.ID][Math.max(0, popHistory[row.ID].length - 10)];
+        return [row.ID, row.Status, row.Players, delta5s, delta10s];
     })
 
   cells.enter()
@@ -86,7 +87,7 @@ function getUpdateFromServer() {
     }
     window.setTimeout(getUpdateFromServer, 1000);
   };
-  xhr.open('get', 'service/game-poller-data.json', true);
+  xhr.open('get', 'service/new-game-scanner-data.json', true);
   xhr.responseType = 'json';
   xhr.send();
 }
@@ -109,6 +110,6 @@ function start() {
 </script>
 </head>
 <body onload="start()">
-<h2>The Thing of Slight Awesomeness</h2>
+<h2>New Game Scanner</h2>
 </body>
 </html>

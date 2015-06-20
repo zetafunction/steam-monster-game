@@ -6,13 +6,13 @@ import (
 )
 
 func main() {
-	http.HandleFunc("/game-poller",
+	http.HandleFunc("/new-game-scanner",
 		func(w http.ResponseWriter, req *http.Request) {
-			http.ServeFile(w, req, "game-poller.html")
+			http.ServeFile(w, req, "new-game-scanner.html")
 		})
-	http.HandleFunc("/game-poller-dev",
+	http.HandleFunc("/new-game-scanner-dev",
 		func(w http.ResponseWriter, req *http.Request) {
-			http.ServeFile(w, req, "game-poller-dev.html")
+			http.ServeFile(w, req, "new-game-scanner-dev.html")
 		})
 	log.Fatal("ListenAndServe: ", http.ListenAndServe("127.0.0.1:2741", nil))
 }

@@ -18,7 +18,7 @@ func main() {
 	}
 
 	dataRequests := make(chan chan []byte, 50)
-	http.HandleFunc("/game-poller-data.json",
+	http.HandleFunc("/new-game-scanner-data.json",
 		func(w http.ResponseWriter, req *http.Request) {
 			request := make(chan []byte)
 			dataRequests <- request
