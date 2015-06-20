@@ -16,20 +16,24 @@ func findGameIndex(service *steam.APIService, start int) (int, error) {
 	log.Print("Searching for invalid games starting at game ", start)
 	lastValid := -1
 	lastInvalid := -1
+	errors := 0
 	// Probe around the starting index to find a range to binary search over.
 	for i, inc := start, 1; ; i, inc = i+inc, inc*2 {
-		log.Print("Probing game ", i)
+		log.Print("new game scanner: probing game ", i)
 		result := <-service.GetGameData(i)
 		if result.Err != nil {
-			// TODO: This should be more robust.
 			log.Print("GetGameData failed: ", result.Err)
-			return 0, result.Err
+			if errors > 8 {
+				log.Print("new game scanner: too many errors while finding next invalid game, giving up!")
+				return 0, result.Err
+			}
+			errors++
 		}
 		switch result.Response.GetGameData().GetStatus() {
 		case messages.EMiniGameStatus_k_EMiniGameStatus_Invalid:
 			lastInvalid = i
 			if lastValid == -1 {
-				log.Print("Initial index was invalid: searching downwards!")
+				log.Print("new game scanner: initial index was invalid: searching downwards!")
 				inc = -1
 			}
 		default:
@@ -40,7 +44,7 @@ func findGameIndex(service *steam.APIService, start int) (int, error) {
 			break
 		}
 	}
-	log.Printf("Binary searching between valid game at %d and invalid game at %d\n", lastValid, lastInvalid)
+	log.Printf("new game scanner: binary searching between valid game at %d and invalid game at %d", lastValid, lastInvalid)
 	// Strictly speaking, a binary search is a bit dangerous because things might change.
 	// Hopefully it returns close enough to the right result.
 	var err error
@@ -69,11 +73,11 @@ type NewGameScanner struct {
 	InvalidGameUpdate chan int
 }
 
-func (p *NewGameScanner) Start() {
+func (s *NewGameScanner) Start() {
 	go func() {
 		for {
-			if json, err := p.updateData(); err == nil {
-				p.DataUpdate <- json
+			if json, err := s.updateData(); err == nil {
+				s.DataUpdate <- json
 			} else {
 				log.Print("updateData failed: ", err)
 			}
@@ -82,10 +86,10 @@ func (p *NewGameScanner) Start() {
 	}()
 }
 
-func (p *NewGameScanner) updateData() ([]byte, error) {
-	log.Printf("Updating data (invalid: %d, flex: %d)\n", p.invalid, p.flex)
-	start := p.invalid - 25 - p.flex
-	end := p.invalid + 5
+func (s *NewGameScanner) updateData() ([]byte, error) {
+	log.Printf("new game scanner: updating (invalid: %d, flex: %d)\n", s.invalid, s.flex)
+	start := s.invalid - 25 - s.flex
+	end := s.invalid + 5
 
 	type update struct {
 		id     int
@@ -96,7 +100,7 @@ func (p *NewGameScanner) updateData() ([]byte, error) {
 	failed := 0
 	for i := start; i < end; i++ {
 		go func(i int) {
-			result := <-p.service.GetGameData(i)
+			result := <-s.service.GetGameData(i)
 			if result.Err != nil {
 				failed++
 			}
@@ -119,10 +123,12 @@ func (p *NewGameScanner) updateData() ([]byte, error) {
 	var results []statusEntry
 	firstWaiting := end
 	firstInvalid := end
+	errors := 0
 	for i := start; i < end; i++ {
 		// Sometimes, the server likes to give out 500 errors, just because...
 		if m[i].Err != nil {
 			results = append(results, statusEntry{i, "???????", 0})
+			errors++
 			continue
 		}
 		var status string
@@ -151,14 +157,31 @@ func (p *NewGameScanner) updateData() ([]byte, error) {
 
 	// Always try to have at least one actively updated non-waiting entry.
 	reclaimableFlex := firstWaiting - (start + 1)
-	if reclaimableFlex > 0 && p.flex > 0 {
-		p.flex -= reclaimableFlex
-		if p.flex < 0 {
-			p.flex = 0
+	if reclaimableFlex > 0 && s.flex > 0 {
+		s.flex -= reclaimableFlex
+		if s.flex < 0 {
+			s.flex = 0
 		}
 	}
-	p.flex += firstInvalid - p.invalid
-	p.invalid = firstInvalid
+
+	// The index of the first invalid game changed: try to find the next one.
+	if s.invalid != firstInvalid {
+		// Only update the index of the first invalid game if the Steam API is mostly working.
+		if errors < 8 {
+			log.Print("new game scanner: finding next invalid game...")
+			nextInvalid, err := findGameIndex(s.service, firstInvalid-1)
+			if err != nil {
+				log.Print("findGameIndex failed: ", err)
+			} else {
+				log.Print("new game scanner: next invalid game at ", nextInvalid)
+				firstInvalid = nextInvalid
+			}
+			s.flex += firstInvalid - s.invalid
+			s.invalid = firstInvalid
+		} else {
+			log.Print("new game scanner: skipping invalid game search due to Steam errors")
+		}
+	}
 
 	return json.Marshal(results)
 }
