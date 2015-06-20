@@ -10,7 +10,7 @@ import (
 )
 
 // TODO: Remember where the search started previously.
-const searchStart = 47000
+const searchStart = 48308
 
 func findGameIndex(service *steam.APIService, start int) (int, error) {
 	log.Print("Searching for invalid games starting at game ", start)
@@ -171,6 +171,6 @@ func NewNewGameScanner(service *steam.APIService) (*NewGameScanner, error) {
 		return nil, err
 	}
 	log.Print("First invalid game around ", invalid)
-	p := &NewGameScanner{service, invalid, 0, make(chan []byte), make(chan int)}
+	p := &NewGameScanner{service, invalid, 25, make(chan []byte), make(chan int)}
 	return p, nil
 }
