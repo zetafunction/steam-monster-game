@@ -150,7 +150,7 @@ func (p *NewGameScanner) updateData() ([]byte, error) {
 	}
 
 	// Always try to have at least one actively updated non-waiting entry.
-	reclaimableFlex := firstWaiting - (start + 2)
+	reclaimableFlex := firstWaiting - (start + 1)
 	if reclaimableFlex > 0 && p.flex > 0 {
 		p.flex -= reclaimableFlex
 		if p.flex < 0 {
