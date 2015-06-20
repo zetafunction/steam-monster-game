@@ -118,7 +118,7 @@ func (p *NewGameScanner) updateData() ([]byte, error) {
 	}
 	var results []statusEntry
 	firstWaiting := end
-	firstInvalid := p.invalid
+	firstInvalid := end
 	for i := start; i < end; i++ {
 		// Sometimes, the server likes to give out 500 errors, just because...
 		if m[i].Err != nil {
