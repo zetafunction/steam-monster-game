@@ -116,7 +116,11 @@ func (s *ApiService) dispatchPendingRequests() {
 			s.inFlight <- struct{}{}
 			return
 		}
-		go s.pendingRequests[0]()
+		req := s.pendingRequests[0]
+		go func() {
+			req()
+			s.inFlight <- struct{}{}
+		}()
 		s.pendingRequests = s.pendingRequests[1:]
 	}
 }
