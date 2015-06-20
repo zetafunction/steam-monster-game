@@ -5,6 +5,7 @@ import "fmt"
 import "io/ioutil"
 import "net/http"
 import "log"
+import "time"
 
 const gameDataURL = "http://steamapi-a.akamaihd.net/ITowerAttackMiniGameService/GetGameData/v0001/?gameid=%d&include_stats=1&format=json"
 
@@ -17,7 +18,21 @@ const (
 	GameStatusEnded
 )
 
-const requestsPerSecond = 100
+const (
+	maxRequestsInFlight  = 100
+	maxRequestsPerSecond = 100
+)
+
+type ApiService struct {
+	// Limiters for requests in flight and requests per second.
+	inFlight  chan struct{}
+	perSecond chan struct{}
+
+	request         chan func()
+	pendingRequests []func()
+
+	quit chan struct{}
+}
 
 type GameDataReply struct {
 	GameData struct {
@@ -31,7 +46,7 @@ type GameDataReply struct {
 
 func (s *ApiService) GetGameData(id int) <-chan *GameDataReply {
 	c := make(chan *GameDataReply)
-	s.requests <- func() {
+	s.request <- func() {
 		var response struct {
 			Response GameDataReply
 		}
@@ -59,29 +74,64 @@ func (s *ApiService) GetGameData(id int) <-chan *GameDataReply {
 	return c
 }
 
+func (s *ApiService) Start() {
+	fillBucket(s.inFlight, maxRequestsInFlight)
+	fillBucket(s.perSecond, maxRequestsPerSecond)
+	t := time.NewTicker(time.Second)
+	for {
+		select {
+		case <-t.C:
+			fillBucket(s.perSecond, maxRequestsPerSecond)
+			s.dispatchPendingRequests()
+
+		case req := <-s.request:
+			s.pendingRequests = append(s.pendingRequests, req)
+			s.dispatchPendingRequests()
+		case <-s.quit:
+			return
+		}
+	}
+}
+
+func fillBucket(c chan<- struct{}, n int) {
+	for i := 0; i < n; i++ {
+		select {
+		case c <- struct{}{}:
+		default:
+			return
+		}
+	}
+}
+
+func (s *ApiService) dispatchPendingRequests() {
+	for len(s.pendingRequests) > 0 {
+		select {
+		case <-s.inFlight:
+		default:
+			return
+		}
+		select {
+		case <-s.perSecond:
+		default:
+			s.inFlight <- struct{}{}
+			return
+		}
+		go s.pendingRequests[0]()
+		s.pendingRequests = s.pendingRequests[1:]
+	}
+}
+
 func (s *ApiService) Stop() {
 	close(s.quit)
 }
 
-type ApiService struct {
-	requests chan func()
-	quit     chan struct{}
-}
-
 func NewApiService() *ApiService {
 	service := &ApiService{
-		requests: make(chan func()),
-		quit:     make(chan struct{}),
+		inFlight:  make(chan struct{}, maxRequestsInFlight),
+		perSecond: make(chan struct{}, maxRequestsPerSecond),
+		request:   make(chan func()),
+		quit:      make(chan struct{}),
 	}
-	go func() {
-		for {
-			select {
-			case req := <-service.requests:
-				go req()
-			case <-service.quit:
-				return
-			}
-		}
-	}()
+	go service.Start()
 	return service
 }
