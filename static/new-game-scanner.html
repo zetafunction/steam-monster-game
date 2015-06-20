@@ -81,11 +81,11 @@ function updateTable(data) {
 function getUpdateFromServer() {
   var xhr = new XMLHttpRequest();
   xhr.onloadend = function () {
+    window.setTimeout(getUpdateFromServer, 1000);
     if (xhr.status == 200) {
       if (xhr.response)
         updateTable(xhr.response);
     }
-    window.setTimeout(getUpdateFromServer, 1000);
   };
   xhr.open('get', 'service/new-game-scanner-data.json', true);
   xhr.responseType = 'json';
