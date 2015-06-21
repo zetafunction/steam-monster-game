@@ -64,9 +64,9 @@ function updateTable(data) {
       // Otherwise, just fall back on the naive version.
       var currentLevelsPerMinute = row.Level / gameElapsedTime;
       if (levelHistory[row.ID].length >= 15)
-        currentLevelsPerMinute = delta15m * 60 / 15;
+        currentLevelsPerMinute = delta15m / (60 * 15);
       else if (levelHistory[row.ID].length >= 5)
-        currentLevelsPerMinute = delta5m * 60 / 5;
+        currentLevelsPerMinute = delta5m / (60 * 5);
       var eta = Math.round((maxLevel - row.Level) / currentLevelsPerMinute);
       return [row.ID, row.Level, delta5m, delta15m, row.ActivePlayers, row.Players, row.BossLevels, row.NormalLevels, row.Level - row.BossLevels - row.NormalLevels, levelsPerMinute, eta, gameElapsedTime, levelElapsedTime, row.Clicks, row.AbilitiesUsed, row.ItemsUsed];
       });
