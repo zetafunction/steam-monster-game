@@ -9,8 +9,8 @@ import (
 )
 
 type NewGameScanner struct {
-	service *steam.APIService
-	quit    chan struct{}
+	api  *steam.APIService
+	quit chan struct{}
 
 	invalidUpdate chan int
 	invalid       int
@@ -22,10 +22,10 @@ type NewGameScanner struct {
 	update chan []byte
 }
 
-func NewNewGameScanner(service *steam.APIService, f *RangeFinder) *NewGameScanner {
-	invalidUpdate := f.SubscribeInvalid()
+func NewNewGameScanner(api *steam.APIService, finder *RangeFinder) *NewGameScanner {
+	invalidUpdate := finder.SubscribeInvalid()
 	return &NewGameScanner{
-		service,
+		api,
 		make(chan struct{}),
 		invalidUpdate,
 		<-invalidUpdate,
@@ -81,7 +81,7 @@ func (s *NewGameScanner) updateData() ([]byte, error) {
 	failed := 0
 	for i := start; i < end; i++ {
 		go func(i int) {
-			result := <-s.service.GetGameData(i)
+			result := <-s.api.GetGameData(i)
 			if result.Err != nil {
 				failed++
 			}

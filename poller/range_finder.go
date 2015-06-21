@@ -9,8 +9,8 @@ import (
 )
 
 type RangeFinder struct {
-	service *steam.APIService
-	quit    chan struct{}
+	api  *steam.APIService
+	quit chan struct{}
 
 	// The ID of the first non-ended game.
 	nonEnded          int
@@ -24,9 +24,9 @@ type RangeFinder struct {
 	pending map[chan int]int
 }
 
-func NewRangeFinder(service *steam.APIService) *RangeFinder {
+func NewRangeFinder(api *steam.APIService) *RangeFinder {
 	return &RangeFinder{
-		service,
+		api,
 		make(chan struct{}),
 		1,
 		make(map[chan int]struct{}),
@@ -135,7 +135,7 @@ func (f *RangeFinder) findGame(start int, finder finderFunc) (int, error) {
 	// Exponentially probe upwards to start.
 	for i, inc := start, 1; ; i, inc = i+inc, inc*2 {
 		log.Print("range finder: probing game ", i)
-		result := <-f.service.GetGameData(i)
+		result := <-f.api.GetGameData(i)
 		if result.Err != nil {
 			log.Print("GetGameData failed: ", result.Err)
 			if errors > 8 {
@@ -156,7 +156,7 @@ func (f *RangeFinder) findGame(start int, finder finderFunc) (int, error) {
 	// Hopefully it returns close enough to the right result.
 	offset := sort.Search(end-start, func(i int) bool {
 		// TODO: Should this do the same error limiting that the previous loop does?
-		result := <-f.service.GetGameData(start + i)
+		result := <-f.api.GetGameData(start + i)
 		if result.Err != nil {
 			return false
 		}
