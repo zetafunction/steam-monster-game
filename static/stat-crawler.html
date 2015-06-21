@@ -88,7 +88,14 @@ function updateTable(data) {
 
 function updateSort(rows) {
   rows.sort(function (a, b) {
-      return sortDirection * (a[sortColumn] - b[sortColumn]);
+      if (a[sortColumn] != b[sortColumn])
+        return sortDirection * (a[sortColumn] - b[sortColumn]);
+      // Make the sort stable. Break ties by level, game time, and game ID.
+      if (a[1] != b[1])
+        return b[1] - a[1];
+      if (a[10] != b[10])
+        return a[10] - b[10];
+      return b[0] - a[0];
       });
 }
 
