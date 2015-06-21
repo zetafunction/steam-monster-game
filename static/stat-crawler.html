@@ -80,7 +80,7 @@ function updateTable(data) {
     .append('td');
 
   cells.text(function(d, i) {
-      if (i == 1) return d;
+      if (i == 0) return d;
       if (i < 10 || i > 12) return d.toLocaleString();
       if (d == 0) return 'DONE';
       if (d > 86400) return '>1 day';
