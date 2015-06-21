@@ -61,12 +61,12 @@ func (s *NewGameScanner) Start() {
 	}()
 }
 
-func (s *NewGameScanner) GetUpdateChannel() <-chan []byte {
-	return s.update
-}
-
 func (s *NewGameScanner) Stop() {
 	close(s.quit)
+}
+
+func (s *NewGameScanner) GetUpdateChannel() <-chan []byte {
+	return s.update
 }
 
 func (s *NewGameScanner) updateData() ([]byte, error) {
