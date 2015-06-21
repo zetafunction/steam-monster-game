@@ -23,7 +23,7 @@ type NewGameScanner struct {
 }
 
 func NewNewGameScanner(service *steam.APIService, f *RangeFinder) *NewGameScanner {
-	invalidUpdate := f.Subscribe()
+	invalidUpdate := f.SubscribeInvalid()
 	return &NewGameScanner{
 		service,
 		make(chan struct{}),

@@ -60,9 +60,15 @@ func (f *RangeFinder) Stop() {
 	close(f.quit)
 }
 
-func (f *RangeFinder) Subscribe() chan int {
+func (f *RangeFinder) SubscribeInvalid() chan int {
 	c := make(chan int)
 	f.invalidListeners[c] = struct{}{}
+	return c
+}
+
+func (f *RangeFinder) SubscribeNonEnded() chan int {
+	c := make(chan int)
+	f.nonEndedListeners[c] = struct{}{}
 	return c
 }
 
@@ -71,6 +77,7 @@ func (f *RangeFinder) Unsubscribe(c chan int) {
 	delete(f.pending, c)
 }
 
+// TODO: Adding some indirection through a map and enum would reduce the copy-paste here.
 func (f *RangeFinder) updateInvalid() {
 	newInvalid, err := f.findGame(f.invalid, invalidGameFinder)
 	if err != nil {
@@ -88,6 +95,19 @@ func (f *RangeFinder) updateInvalid() {
 }
 
 func (f *RangeFinder) updateNonEnded() {
+	newNonEnded, err := f.findGame(f.nonEnded, nonEndedGameFinder)
+	if err != nil {
+		log.Print("range finder: findGame: ", err)
+		return
+	}
+	if newNonEnded == f.nonEnded {
+		return
+	}
+	log.Print("range finder: non-ended game changed to ", newNonEnded)
+	for c := range f.nonEndedListeners {
+		f.pending[c] = newNonEnded
+	}
+	f.nonEnded = newNonEnded
 }
 
 func (f *RangeFinder) notifyPending() {
@@ -105,6 +125,9 @@ func invalidGameFinder(r *steam.GameDataResult) bool {
 	return r.Response.GetGameData().GetStatus() == messages.EMiniGameStatus_k_EMiniGameStatus_Invalid
 }
 
+func nonEndedGameFinder(r *steam.GameDataResult) bool {
+	return r.Response.GetGameData().GetStatus() != messages.EMiniGameStatus_k_EMiniGameStatus_Ended
+}
 func (f *RangeFinder) findGame(start int, finder finderFunc) (int, error) {
 	log.Print("range finder: searching for games starting at ", start)
 	end := start
