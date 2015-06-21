@@ -29,7 +29,6 @@ var sortColumn = 1;  // Default to sorting by level descending.
 var sortDirection = -1;
 // TODO: It feels like d3 should be able to handle this itself but meh.
 var levelHistory = {};
-var lpsHistory = {};
 
 function pad2(n) {
   if (n < 10) return '0' + n;
@@ -61,25 +60,7 @@ function updateTable(data) {
       // The server is mostly stateless, so it doesn't keep track of when a game hit 100M. As a
       // result, this number is somewhat inaccurate for games that hit 100M.
       var levelsPerMinute = Math.floor(row.Level / (gameElapsedTime / 60));
-      // If there's enough history, use it to estimate the current levelling rate.
-      // Otherwise, just fall back on the naive version.
-      var currentLevelsPerSecond = row.Level / gameElapsedTime;
-      if (levelHistory[row.ID].length >= 15)
-        currentLevelsPerSecond = delta15m / (60 * 15);
-      else if (levelHistory[row.ID].length >= 5)
-        currentLevelsPerSecond = delta5m / (60 * 5);
-      // Scientifically guesstimate an average of the average levels / second.
-      if (row.ID in lpsHistory) {
-        lpsHistory[row.ID].push(currentLevelsPerSecond);
-        if (lpsHistory[row.ID].length > 60)
-          lpsHistory[row.ID].shift();
-      } else {
-        lpsHistory[row.ID] = [currentLevelsPerSecond];
-      }
-      var averageLevelsPerSecond = Math.pow(
-          lpsHistory[row.ID].reduce(function (p, c) { return p * c; }, 1),
-          1 / lpsHistory[row.ID].length);
-      var eta = Math.round((maxLevel - row.Level) / averageLevelsPerSecond);
+      var eta = Math.round((maxLevel - row.Level) / (row.Level / gameElapsedTime));
       return [row.ID, row.Level, delta5m, delta15m, row.ActivePlayers, row.Players, row.BossLevels, row.NormalLevels, row.Level - row.BossLevels - row.NormalLevels, levelsPerMinute, eta, gameElapsedTime, levelElapsedTime, row.Clicks, row.AbilitiesUsed, row.ItemsUsed];
       });
 
