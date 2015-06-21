@@ -28,15 +28,17 @@ func NewStatCrawler(api *steam.APIService, finder *RangeFinder) *StatCrawler {
 		api,
 		make(chan struct{}),
 		nonEndedUpdate,
-		<-nonEndedUpdate,
+		-1,
 		invalidUpdate,
-		<-invalidUpdate,
+		-1,
 		make(chan []byte),
 	}
 }
 
 func (c *StatCrawler) Start() {
 	go func() {
+		c.invalid = <-c.invalidUpdate
+		c.nonEnded = <-c.nonEndedUpdate
 		t := time.After(time.Second * 30)
 		for {
 			select {

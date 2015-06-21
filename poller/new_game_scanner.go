@@ -28,14 +28,15 @@ func NewNewGameScanner(api *steam.APIService, finder *RangeFinder) *NewGameScann
 		api,
 		make(chan struct{}),
 		invalidUpdate,
-		<-invalidUpdate,
+		-1,
 		25,
 		make(chan []byte)}
 }
 
 func (s *NewGameScanner) Start() {
-	t := time.After(time.Second)
 	go func() {
+		s.invalid = <-s.invalidUpdate
+		t := time.After(time.Second)
 		for {
 			select {
 			case <-t:

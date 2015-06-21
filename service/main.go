@@ -9,20 +9,33 @@ import (
 )
 
 func main() {
-	service := steam.NewAPIService()
+	api := steam.NewAPIService()
+	rangeFinder := poller.NewRangeFinder(api)
+	newGameScanner := poller.NewNewGameScanner(api, rangeFinder)
 
-	rangeFinder := poller.NewRangeFinder(service)
-	rangeFinder.Start()
-	newGameScanner := poller.NewNewGameScanner(service, rangeFinder)
+	// The stat crawler uses its own instance of APIService to avoid blocking requests for
+	// other, more critical, services.
+	statCrawler := poller.NewStatCrawler(steam.NewAPIService(), rangeFinder)
+
 	newGameScanner.Start()
+	statCrawler.Start()
+	// The range finder must be started last, so other services that depend on notifications
+	// will properly receive them.
+	rangeFinder.Start()
 
 	newGameScannerRequests := make(chan chan []byte, 50)
+	statCrawlerRequests := make(chan chan []byte, 50)
 	http.HandleFunc("/new-game-scanner-data.json",
 		func(w http.ResponseWriter, req *http.Request) {
 			request := make(chan []byte)
 			newGameScannerRequests <- request
-			json := <-request
-			io.WriteString(w, string(json))
+			io.WriteString(w, string(<-request))
+		})
+	http.HandleFunc("/stat-crawler-data.json",
+		func(w http.ResponseWriter, req *http.Request) {
+			request := make(chan []byte)
+			statCrawlerRequests <- request
+			io.WriteString(w, string(<-request))
 		})
 	log.Print("Starting HTTP server...")
 	go func() {
@@ -31,11 +44,15 @@ func main() {
 		}
 	}()
 	var newGameScannerData []byte
+	var statCrawlerData []byte
 	for {
 		select {
 		case newGameScannerData = <-newGameScanner.GetUpdateChannel():
+		case statCrawlerData = <-statCrawler.GetUpdateChannel():
 		case req := <-newGameScannerRequests:
 			req <- newGameScannerData
+		case req := <-statCrawlerRequests:
+			req <- statCrawlerData
 		}
 	}
 }
