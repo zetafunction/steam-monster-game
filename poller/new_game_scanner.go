@@ -9,15 +9,17 @@ import (
 	"time"
 )
 
-// TODO: Remember where the search started previously.
-const searchStart = 48308
+type finderFunc func(*steam.GameDataResult) bool
 
-func findGameIndex(service *steam.APIService, start int) (int, error) {
-	log.Print("Searching for invalid games starting at game ", start)
-	lastValid := -1
-	lastInvalid := -1
+func invalidGameFinder(r *steam.GameDataResult) bool {
+	return r.Response.GetGameData().GetStatus() == messages.EMiniGameStatus_k_EMiniGameStatus_Invalid
+}
+
+func findGame(service *steam.APIService, start int, finder finderFunc) (int, error) {
+	log.Print("new game scanner: searching for games starting at ", start)
+	end := start
 	errors := 0
-	// Probe around the starting index to find a range to binary search over.
+	// Exponentially probe upwards to start.
 	for i, inc := start, 1; ; i, inc = i+inc, inc*2 {
 		log.Print("new game scanner: probing game ", i)
 		result := <-service.GetGameData(i)
@@ -28,35 +30,26 @@ func findGameIndex(service *steam.APIService, start int) (int, error) {
 				return 0, result.Err
 			}
 			errors++
+			continue
 		}
-		switch result.Response.GetGameData().GetStatus() {
-		case messages.EMiniGameStatus_k_EMiniGameStatus_Invalid:
-			lastInvalid = i
-			if lastValid == -1 {
-				log.Print("new game scanner: initial index was invalid: searching downwards!")
-				inc = -1
-			}
-		default:
-			log.Print("Saw valid game at index ", i)
-			lastValid = i
-		}
-		if lastValid != -1 && lastInvalid != -1 {
+		if finder(result) {
+			end = i
 			break
 		}
+		start = i
 	}
-	log.Printf("new game scanner: binary searching between valid game at %d and invalid game at %d", lastValid, lastInvalid)
+	log.Print("new game scanner: binary searching between ", start, " and ", end)
 	// Strictly speaking, a binary search is a bit dangerous because things might change.
 	// Hopefully it returns close enough to the right result.
-	var err error
-	invalidOffset := sort.Search(lastInvalid-lastValid+1, func(i int) bool {
-		// TODO: Panic?
-		result := <-service.GetGameData(lastValid + i)
+	offset := sort.Search(end-start, func(i int) bool {
+		// TODO: Should this do the same error limiting that the previous loop does?
+		result := <-service.GetGameData(start + i)
 		if result.Err != nil {
-			err = result.Err
+			return false
 		}
-		return result.Response.GetGameData().GetStatus() == messages.EMiniGameStatus_k_EMiniGameStatus_Invalid
+		return finder(result)
 	})
-	return lastValid + invalidOffset, err
+	return start + offset, nil
 }
 
 type NewGameScanner struct {
@@ -169,9 +162,9 @@ func (s *NewGameScanner) updateData() ([]byte, error) {
 		// Only update the index of the first invalid game if the Steam API is mostly working.
 		if errors < 8 {
 			log.Print("new game scanner: finding next invalid game...")
-			nextInvalid, err := findGameIndex(s.service, firstInvalid-1)
+			nextInvalid, err := findGame(s.service, firstInvalid, invalidGameFinder)
 			if err != nil {
-				log.Print("findGameIndex failed: ", err)
+				log.Print("findGamefailed: ", err)
 			} else {
 				log.Print("new game scanner: next invalid game at ", nextInvalid)
 				firstInvalid = nextInvalid
@@ -188,9 +181,9 @@ func (s *NewGameScanner) updateData() ([]byte, error) {
 
 func NewNewGameScanner(service *steam.APIService) (*NewGameScanner, error) {
 	// TODO: This should probably be a receiver method of NewGameScanner.
-	invalid, err := findGameIndex(service, searchStart)
+	invalid, err := findGame(service, 1, invalidGameFinder)
 	if err != nil {
-		log.Print("findGameIndex failed: ", err)
+		log.Print("findGamefailed: ", err)
 		return nil, err
 	}
 	log.Print("First invalid game around ", invalid)
