@@ -18,5 +18,9 @@ func main() {
 		func(w http.ResponseWriter, req *http.Request) {
 			http.ServeFile(w, req, "stat-crawler.html")
 		})
+	http.HandleFunc("/stat-crawler-new",
+		func(w http.ResponseWriter, req *http.Request) {
+			http.ServeFile(w, req, "stat-crawler-new.html")
+		})
 	log.Fatal("ListenAndServe: ", http.ListenAndServe("127.0.0.1:2741", nil))
 }

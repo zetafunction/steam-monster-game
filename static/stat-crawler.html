@@ -52,12 +52,14 @@ function updateTable(data) {
       } else {
       levelHistory[row.ID] = [row.Level];
       }
-      var delta1m = row.Level - levelHistory[row.ID][Math.max(0, levelHistory[row.ID].length - 1)];
       var delta5m = row.Level - levelHistory[row.ID][Math.max(0, levelHistory[row.ID].length - 5)];
       var delta10m = row.Level - levelHistory[row.ID][Math.max(0, levelHistory[row.ID].length - 15)];
       var gameElapsedTime = now - row.GameStart;
       var levelElapsedTime = now - row.LevelStart;
-      return [row.ID, row.Level, delta1m, delta5m, delta10m, row.ActivePlayers, row.Players, row.BossLevels, row.NormalLevels, row.Level - row.BossLevels - row.NormalLevels, gameElapsedTime, levelElapsedTime, row.Clicks, row.AbilitiesUsed, row.ItemsUsed];
+      // The server is mostly stateless, so it doesn't keep track of when a game hit 100M. As a
+      // result, this number is somewhat inaccurate for games that hit 100M.
+      var levelsPerMinute = Math.floor(row.Level / (gameElapsedTime / 60));
+      return [row.ID, row.Level, delta5m, delta10m, row.ActivePlayers, row.Players, row.BossLevels, row.NormalLevels, row.Level - row.BossLevels - row.NormalLevels, levelsPerMinute, gameElapsedTime, levelElapsedTime, row.Clicks, row.AbilitiesUsed, row.ItemsUsed];
       });
 
   var rows = gameTable.selectAll('tr')
@@ -109,7 +111,6 @@ function start() {
   var columns = [
     'Game #',
     'Level',
-    '\u0394t=1m',
     '\u0394t=5m',
     '\u0394t=15m',
     'Active Players',
@@ -117,6 +118,7 @@ function start() {
     'Boss Levels',
     'Normal Levels',
     'Skipped Levels',
+    'Levels per minute',
     'Game Time',
     'Level Time',
     'Clicks',
