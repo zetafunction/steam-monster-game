@@ -99,6 +99,8 @@ func (c *StatCrawler) updateData() ([]byte, error) {
 		Clicks        uint64
 		AbilitiesUsed uint64
 		ItemsUsed     uint64
+		NormalLevels  uint64
+		BossLevels    uint64
 	}
 	var results []statEntry
 	for i := c.nonEnded; i < c.invalid; i++ {
@@ -119,6 +121,8 @@ func (c *StatCrawler) updateData() ([]byte, error) {
 			Clicks:        r.GetStats().GetNumClicks(),
 			AbilitiesUsed: r.GetStats().GetNumAbilitiesActivated(),
 			ItemsUsed:     r.GetStats().GetNumAbilityItemsActivated(),
+			NormalLevels:  r.GetStats().GetNumTowersKilled() / 3,
+			BossLevels:    r.GetStats().GetNumBossesKilled(),
 		})
 	}
 	return json.Marshal(results)
