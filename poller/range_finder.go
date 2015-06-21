@@ -42,11 +42,9 @@ func (f *RangeFinder) Start() {
 		for {
 			select {
 			case <-t:
-				func() {
-					defer func() { t = time.After(time.Second) }()
-					f.updateInvalid()
-					f.updateNonEnded()
-				}()
+				f.updateInvalid()
+				f.updateNonEnded()
+				t = time.After(time.Second)
 			case <-f.quit:
 				// TODO: Close any open listeners here?
 				return

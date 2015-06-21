@@ -40,13 +40,15 @@ func (s *NewGameScanner) Start() {
 			select {
 			case <-t:
 				func() {
-					defer func() { t = time.After(time.Second) }()
-					json, err := s.updateData()
-					if err != nil {
-						log.Print("updateData failed: ", err)
-						return
-					}
-					s.update <- json
+					func() {
+						json, err := s.updateData()
+						if err != nil {
+							log.Print("updateData failed: ", err)
+							return
+						}
+						s.update <- json
+					}()
+					t = time.After(time.Second)
 				}()
 			case newInvalid := <-s.invalidUpdate:
 				s.flex += newInvalid - s.invalid
