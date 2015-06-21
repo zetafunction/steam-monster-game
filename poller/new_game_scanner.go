@@ -76,22 +76,17 @@ func (s *NewGameScanner) updateData() ([]byte, error) {
 		id     int
 		result *steam.GameDataResult
 	}
-	c := make(chan update)
+	updates := make(chan update)
 	requests := 0
-	failed := 0
 	for i := start; i < end; i++ {
 		go func(i int) {
-			result := <-s.api.GetGameData(i)
-			if result.Err != nil {
-				failed++
-			}
-			c <- update{i, result}
+			updates <- update{i, <-s.api.GetGameData(i)}
 		}(i)
 		requests++
 	}
 	m := make(map[int]*steam.GameDataResult)
 	for requests > 0 {
-		update := <-c
+		update := <-updates
 		m[update.id] = update.result
 		requests--
 	}
