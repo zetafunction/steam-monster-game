@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Stat Crawler</title>
+<link href='https://fonts.googleapis.com/css?family=Roboto' rel='stylesheet' type='text/css'>
+<link href='https://fonts.googleapis.com/css?family=Droid+Sans+Mono' rel='stylesheet' type='text/css'>
+<script src='https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.5/d3.min.js' charset='utf-8'></script>
+<style>
+body { font: 14px 'Roboto', sans-serif; }
+table { font: 12px 'Droid Sans Mono', monospace; }
+tr:nth-child(even) { background: #CCC; }
+tr:nth-child(odd) { background: #FFF; }
+th, td {
+  max-width: 12ch;
+  padding: 3px 6px;
+  text-align: right;
+  vertical-align: bottom;
+}
+td:first-child { text-align: center; }
+th {
+  background: lightblue;
+  text-align: center;
+}
+</style>
+<script>
+var gameTable;
+var sortColumn = 1;  // Default to sorting by level descending.
+var sortDirection = -1;
+// TODO: It feels like d3 should be able to handle this itself but meh.
+var levelHistory = {};
+
+function pad2(n) {
+  if (n < 10) return '0' + n;
+  return '' + n;
+}
+
+function durationToString(seconds) {
+  var hours = Math.floor(seconds / 3600);
+  seconds %= 3600;
+  var minutes = Math.floor(seconds / 60);
+  seconds %= 60;
+  return pad2(hours) + 'h ' + pad2(minutes) + 'm ' + pad2(seconds) + 's';
+}
+
+function updateTable(data) {
+  var now = Math.round(Date.now() / 1000);
+  data = data.map(function(row) {
+      if (row.ID in levelHistory) {
+      levelHistory[row.ID].push(row.Level);
+      if (levelHistory[row.ID].length > 100)
+      levelHistory[row.ID].shift();
+      } else {
+      levelHistory[row.ID] = [row.Level];
+      }
+      var delta1m = row.Level - levelHistory[row.ID][Math.max(0, levelHistory[row.ID].length - 1)];
+      var delta5m = row.Level - levelHistory[row.ID][Math.max(0, levelHistory[row.ID].length - 5)];
+      var delta10m = row.Level - levelHistory[row.ID][Math.max(0, levelHistory[row.ID].length - 15)];
+      var gameElapsedTime = now - row.GameStart;
+      var levelElapsedTime = now - row.LevelStart;
+      return [row.ID, row.Level, delta1m, delta5m, delta10m, row.ActivePlayers, row.Players, row.BossLevels, row.NormalLevels, row.Level - row.BossLevels - row.NormalLevels, gameElapsedTime, levelElapsedTime, row.Clicks, row.AbilitiesUsed, row.ItemsUsed];
+      });
+
+  var rows = gameTable.selectAll('tr')
+    .data(data, function(d) { return d[0]; });
+
+  rows.enter()
+    .append('tr');
+
+  rows.exit()
+    .remove();
+
+  var cells = rows.selectAll('td')
+    .data(function (d) { return d; })
+
+  cells.enter()
+    .append('td');
+
+  cells.text(function(d, i) {
+      if (i == 0) return d;
+      if (i != 10 && i != 11) return d.toLocaleString();
+      return durationToString(d);
+      })
+
+  updateSort(rows);
+}
+
+function updateSort(rows) {
+  rows.sort(function (a, b) {
+      return sortDirection * (a[sortColumn] - b[sortColumn]);
+      });
+}
+
+function getUpdateFromServer() {
+  var xhr = new XMLHttpRequest();
+  xhr.onloadend = function () {
+    window.setTimeout(getUpdateFromServer, 60 * 1000);
+    if (xhr.status == 200) {
+      if (xhr.response)
+        updateTable(xhr.response);
+    }
+  };
+  xhr.open('get', 'service/stat-crawler-data.json', true);
+  xhr.responseType = 'json';
+  xhr.send();
+}
+
+function start() {
+  // Setup the table.
+  var columns = [
+    'Game #',
+    'Level',
+    '\u0394t=1m',
+    '\u0394t=5m',
+    '\u0394t=15m',
+    'Active Players',
+    'Total Players',
+    'Boss Levels',
+    'Normal Levels',
+    'Skipped Levels',
+    'Game Time',
+    'Level Time',
+    'Clicks',
+    'Abilities Used',
+    'Items Used'
+  ];
+
+  var table = d3.select('#tableContainer').append('table');
+  var thead = table.append('thead');
+  gameTable = table.append('tbody');
+
+  thead.append('tr')
+      .selectAll('th')
+      .data(columns)
+      .enter()
+      .append('th')
+      .text(function(d) { return d; })
+      .on('click', function(d, i) {
+          if (sortColumn == i) {
+            sortDirection *= -1;
+          } else {
+            sortDirection = -1;
+            sortColumn = i;
+          }
+          updateSort(gameTable.selectAll('tr'));
+      });
+
+  getUpdateFromServer();
+}
+</script>
+</head>
+<body onload="start()">
+<h2>Stat Crawler</h2>
+<p>Data refreshes automatically every minute. Click on a column to sort by that column.
+<div id="tableContainer"></div>
+<p>Source available from <a href="https://github.com/zetafunction/steam-monster-game/">GitHub</a>.
+</body>
+</html>

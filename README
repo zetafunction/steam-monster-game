@@ -1,6 +1,4 @@
-An instance of this runs at https://ithildin.com/steam-monster-game/game-poller
+An instance of this runs at https://ithildin.com/steam-monster-game/stat-crawler
 
 TODOs:
-- Implement some stat tracking.
-- Make server startup more robust to 500s.
-- ???
+Lots.

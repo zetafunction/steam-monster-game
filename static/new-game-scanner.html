@@ -27,7 +27,7 @@ var popHistory = {};
 function updateTable(data) {
   data = data.reverse();
   var rows = gameTable.selectAll('tr')
-    .data(data, function(d) { return d.ID; })
+    .data(data, function(d) { return d.ID; });
 
   rows.enter()
     .append('tr');
