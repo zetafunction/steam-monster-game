@@ -30,6 +30,22 @@ var sortDirection = -1;
 // TODO: It feels like d3 should be able to handle this itself but meh.
 var levelHistory = {};
 
+function saveState() {
+  sessionStorage.setItem('steam-monster-game-stats-timestamp', JSON.stringify(Date.now()));
+  sessionStorage.setItem('steam-monster-game-stats-level-history', JSON.stringify(levelHistory));
+}
+
+function loadState() {
+  if (!sessionStorage.getItem('steam-monster-game-stats-timestamp'))
+    return;
+  var d = Date.now() - JSON.parse(sessionStorage.getItem('steam-monster-game-stats-timestamp'));
+  if (d > 90 * 1000)
+    return;
+  levelHistory = JSON.parse(sessionStorage.getItem('steam-monster-game-stats-level-history'));
+}
+
+loadState();
+
 function pad2(n) {
   if (n < 10) return '0' + n;
   return '' + n;
@@ -162,7 +178,7 @@ function start() {
 }
 </script>
 </head>
-<body onload="start()">
+<body onload="start()" onunload="saveState()">
 <h2>Stat Crawler</h2>
 <p>Data refreshes automatically every minute. Click on a column to sort by that column.
 <div id="tableContainer"></div>
