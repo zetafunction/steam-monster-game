@@ -11,11 +11,9 @@ import (
 func main() {
 	service := steam.NewAPIService()
 
-	log.Print("Performing initial data update...")
-	newGameScanner, err := poller.NewNewGameScanner(service)
-	if err != nil {
-		log.Fatal("NewNewGameScanner failed: ", err)
-	}
+	rangeFinder := poller.NewRangeFinder(service)
+	rangeFinder.Start()
+	newGameScanner := poller.NewNewGameScanner(service, rangeFinder)
 	newGameScanner.Start()
 
 	newGameScannerRequests := make(chan chan []byte, 50)
@@ -35,7 +33,7 @@ func main() {
 	var newGameScannerData []byte
 	for {
 		select {
-		case newGameScannerData = <-newGameScanner.DataUpdate:
+		case newGameScannerData = <-newGameScanner.GetUpdateChannel():
 		case req := <-newGameScannerRequests:
 			req <- newGameScannerData
 		}
