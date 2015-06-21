@@ -37,8 +37,8 @@ func NewRangeFinder(api *steam.APIService) *RangeFinder {
 }
 
 func (f *RangeFinder) Start() {
-	t := time.After(time.Second)
 	go func() {
+		t := time.After(time.Second)
 		for {
 			select {
 			case <-t:

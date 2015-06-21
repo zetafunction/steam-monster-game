@@ -39,7 +39,7 @@ func (c *StatCrawler) Start() {
 	go func() {
 		c.invalid = <-c.invalidUpdate
 		c.nonEnded = <-c.nonEndedUpdate
-		t := time.After(time.Second * 30)
+		t := time.After(time.Second * 5)
 		for {
 			select {
 			case <-t:
