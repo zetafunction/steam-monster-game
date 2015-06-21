@@ -54,14 +54,21 @@ function updateTable(data) {
       levelHistory[row.ID] = [row.Level];
       }
       var delta5m = row.Level - levelHistory[row.ID][Math.max(0, levelHistory[row.ID].length - 5)];
-      var delta10m = row.Level - levelHistory[row.ID][Math.max(0, levelHistory[row.ID].length - 15)];
+      var delta15m = row.Level - levelHistory[row.ID][Math.max(0, levelHistory[row.ID].length - 15)];
       var gameElapsedTime = now - row.GameStart;
       var levelElapsedTime = now - row.LevelStart;
       // The server is mostly stateless, so it doesn't keep track of when a game hit 100M. As a
       // result, this number is somewhat inaccurate for games that hit 100M.
       var levelsPerMinute = Math.floor(row.Level / (gameElapsedTime / 60));
-      var eta = Math.round((maxLevel - row.Level) / (row.Level / gameElapsedTime));
-      return [row.ID, row.Level, delta5m, delta10m, row.ActivePlayers, row.Players, row.BossLevels, row.NormalLevels, row.Level - row.BossLevels - row.NormalLevels, levelsPerMinute, eta, gameElapsedTime, levelElapsedTime, row.Clicks, row.AbilitiesUsed, row.ItemsUsed];
+      // If there's enough history, use it to estimate the current levelling rate.
+      // Otherwise, just fall back on the naive version.
+      var currentLevelsPerMinute = row.Level / gameElapsedTime;
+      if (levelHistory[row.ID].length >= 15)
+        currentLevelsPerMinute = delta15m * 60 / 15;
+      else if (levelHistory[row.ID].length >= 5)
+        currentLevelsPerMinute = delta5m * 60 / 5;
+      var eta = Math.round((maxLevel - row.Level) / currentLevelsPerMinute);
+      return [row.ID, row.Level, delta5m, delta15m, row.ActivePlayers, row.Players, row.BossLevels, row.NormalLevels, row.Level - row.BossLevels - row.NormalLevels, levelsPerMinute, eta, gameElapsedTime, levelElapsedTime, row.Clicks, row.AbilitiesUsed, row.ItemsUsed];
       });
 
   var rows = gameTable.selectAll('tr')
