@@ -63,7 +63,6 @@ type NewGameScanner struct {
 	flex int
 
 	DataUpdate        chan []byte
-	InvalidGameUpdate chan int
 }
 
 func (s *NewGameScanner) Start() {
