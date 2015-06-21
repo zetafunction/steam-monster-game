@@ -23,6 +23,7 @@ th {
 }
 </style>
 <script>
+var maxLevel = 100000000;
 var gameTable;
 var sortColumn = 1;  // Default to sorting by level descending.
 var sortDirection = -1;
@@ -59,7 +60,8 @@ function updateTable(data) {
       // The server is mostly stateless, so it doesn't keep track of when a game hit 100M. As a
       // result, this number is somewhat inaccurate for games that hit 100M.
       var levelsPerMinute = Math.floor(row.Level / (gameElapsedTime / 60));
-      return [row.ID, row.Level, delta5m, delta10m, row.ActivePlayers, row.Players, row.BossLevels, row.NormalLevels, row.Level - row.BossLevels - row.NormalLevels, levelsPerMinute, gameElapsedTime, levelElapsedTime, row.Clicks, row.AbilitiesUsed, row.ItemsUsed];
+      var eta = Math.round((maxLevel - row.Level) / (row.Level / gameElapsedTime));
+      return [row.ID, row.Level, delta5m, delta10m, row.ActivePlayers, row.Players, row.BossLevels, row.NormalLevels, row.Level - row.BossLevels - row.NormalLevels, levelsPerMinute, eta, gameElapsedTime, levelElapsedTime, row.Clicks, row.AbilitiesUsed, row.ItemsUsed];
       });
 
   var rows = gameTable.selectAll('tr')
@@ -78,8 +80,10 @@ function updateTable(data) {
     .append('td');
 
   cells.text(function(d, i) {
-      if (i == 0) return d;
-      if (i != 10 && i != 11) return d.toLocaleString();
+      if (i == 1) return d;
+      if (i < 10 || i > 12) return d.toLocaleString();
+      if (d == 0) return 'DONE';
+      if (d > 86400) return '>1 day';
       return durationToString(d);
       })
 
@@ -93,8 +97,8 @@ function updateSort(rows) {
       // Make the sort stable. Break ties by level, game time, and game ID.
       if (a[1] != b[1])
         return b[1] - a[1];
-      if (a[10] != b[10])
-        return a[10] - b[10];
+      if (a[11] != b[11])
+        return a[11] - b[11];
       return b[0] - a[0];
       });
 }
@@ -126,6 +130,7 @@ function start() {
     'Normal Levels',
     'Skipped Levels',
     'Levels per minute',
+    'ETA to 100M',
     'Game Time',
     'Level Time',
     'Clicks',
