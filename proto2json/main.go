@@ -46,6 +46,9 @@ func main() {
 			log.Print("Failed to unmarshal ", path, ": ", err)
 			continue
 		}
+		// Trim out some fields that aren't interesting for ended games.
+		response.GetGameData().Lanes = nil
+		response.GetGameData().Events = nil
 		unmarshalled[int(id)] = response
 	}
 
@@ -64,7 +67,7 @@ func main() {
 		entries = append(entries, entry{id, unmarshalled[id]})
 	}
 
-	marshalled, err := json.Marshal(entries)
+	marshalled, err := json.MarshalIndent(entries, "", "  ")
 	if err != nil {
 		log.Fatal("Marshal failed: ", err)
 	}
