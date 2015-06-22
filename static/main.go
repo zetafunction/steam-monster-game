@@ -7,6 +7,7 @@ import (
 )
 
 var bindInterface = flag.String("bind", "127.0.0.1:2741", "interface to bind to")
+
 func main() {
 	flag.Parse()
 
