@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"github.com/zetafunction/steam-monster-game/poller"
 	"github.com/zetafunction/steam-monster-game/steam"
 	"io"
@@ -8,7 +9,11 @@ import (
 	"net/http"
 )
 
+var bindInterface = flag.String("bind", "127.0.0.1:2742", "interface to bind to")
+
 func main() {
+	flag.Parse()
+
 	api := steam.NewAPIService()
 	rangeFinder := poller.NewRangeFinder(api)
 	newGameScanner := poller.NewNewGameScanner(api, rangeFinder)
@@ -39,7 +44,7 @@ func main() {
 		})
 	log.Print("Starting HTTP server...")
 	go func() {
-		if err := http.ListenAndServe("127.0.0.1:2742", nil); err != nil {
+		if err := http.ListenAndServe(*bindInterface, nil); err != nil {
 			log.Fatal("ListenAndServe: ", err)
 		}
 	}()

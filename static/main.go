@@ -1,11 +1,15 @@
 package main
 
 import (
+	"flag"
 	"log"
 	"net/http"
 )
 
+var bindInterface = flag.String("bind", "127.0.0.1:2741", "interface to bind to")
 func main() {
+	flag.Parse()
+
 	http.HandleFunc("/new-game-scanner",
 		func(w http.ResponseWriter, req *http.Request) {
 			http.ServeFile(w, req, "new-game-scanner.html")
@@ -22,5 +26,5 @@ func main() {
 		func(w http.ResponseWriter, req *http.Request) {
 			http.ServeFile(w, req, "stat-crawler-new.html")
 		})
-	log.Fatal("ListenAndServe: ", http.ListenAndServe("127.0.0.1:2741", nil))
+	log.Fatal("ListenAndServe: ", http.ListenAndServe(*bindInterface, nil))
 }
