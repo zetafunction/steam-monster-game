@@ -57,7 +57,7 @@ func main() {
 			log.Print("failed to serialize game ", i, ": ", err)
 			continue
 		}
-		name := fmt.Sprintf("%d.pb", i)
+		name := fmt.Sprintf("%05d.pb", i)
 		if ioutil.WriteFile(name, serialized, 0644) != nil {
 			log.Print("failed to write game ", i, " data to file: ", err)
 			continue
