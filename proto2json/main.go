@@ -16,6 +16,8 @@ import (
 const shardPath = "[0-9][0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9][0-9]"
 const shardFile = "[0-9][0-9][0-9][0-9][0-9].pb"
 
+var includeBoringGames = flag.Bool("include-boring-games", false, "Include boring games in output.")
+
 func main() {
 	flag.Parse()
 	if len(flag.Args()) != 1 {
@@ -44,6 +46,10 @@ func main() {
 		err = proto.Unmarshal(data, response)
 		if err != nil {
 			log.Print("Failed to unmarshal ", path, ": ", err)
+			continue
+		}
+		if response.GetGameData().GetLevel() == 0 && !*includeBoringGames {
+			log.Print("Skipping boring game ", id)
 			continue
 		}
 		// Trim out some fields that aren't interesting for ended games.
