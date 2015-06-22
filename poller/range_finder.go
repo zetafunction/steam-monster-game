@@ -25,12 +25,13 @@ type RangeFinder struct {
 }
 
 func NewRangeFinder(api *steam.APIService) *RangeFinder {
+	// TODO: Magic numbers to temporarily unbreak things.
 	return &RangeFinder{
 		api,
 		make(chan struct{}),
-		1,
+		49325,
 		make(map[chan int]struct{}),
-		1,
+		50000,
 		make(map[chan int]struct{}),
 		make(map[chan int]int),
 	}
@@ -61,12 +62,14 @@ func (f *RangeFinder) Stop() {
 func (f *RangeFinder) SubscribeInvalid() chan int {
 	c := make(chan int)
 	f.invalidListeners[c] = struct{}{}
+	f.pending[c] = f.invalid
 	return c
 }
 
 func (f *RangeFinder) SubscribeNonEnded() chan int {
 	c := make(chan int)
 	f.nonEndedListeners[c] = struct{}{}
+	f.pending[c] = f.nonEnded
 	return c
 }
 

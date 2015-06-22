@@ -22,23 +22,19 @@ type StatCrawler struct {
 }
 
 func NewStatCrawler(api *steam.APIService, finder *RangeFinder) *StatCrawler {
-	invalidUpdate := finder.SubscribeInvalid()
-	nonEndedUpdate := finder.SubscribeNonEnded()
 	return &StatCrawler{
 		api,
 		make(chan struct{}),
-		nonEndedUpdate,
-		-1,
-		invalidUpdate,
-		-1,
+		finder.SubscribeNonEnded(),
+		0,
+		finder.SubscribeInvalid(),
+		0,
 		make(chan []byte),
 	}
 }
 
 func (c *StatCrawler) Start() {
 	go func() {
-		c.invalid = <-c.invalidUpdate
-		c.nonEnded = <-c.nonEndedUpdate
 		t := time.After(time.Second * 5)
 		for {
 			select {

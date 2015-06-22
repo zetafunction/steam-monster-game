@@ -22,11 +22,9 @@ func main() {
 	// other, more critical, services.
 	statCrawler := poller.NewStatCrawler(steam.NewAPIService(), rangeFinder)
 
+	rangeFinder.Start()
 	newGameScanner.Start()
 	statCrawler.Start()
-	// The range finder must be started last, so other services that depend on notifications
-	// will properly receive them.
-	rangeFinder.Start()
 
 	newGameScannerRequests := make(chan chan []byte, 50)
 	statCrawlerRequests := make(chan chan []byte, 50)
