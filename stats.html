@@ -128,7 +128,9 @@ function updateProgress(e) {
 function filterData() {
   var start = Date.now();
   var data = originalData.filter(function(row) {
-    return row.response.game_data.level > d3.select('#minLevel').property('valueAsNumber');
+    // For whatever reason, some games are missing a starting timestamp. Skip them.
+    return row.response.game_data.timestamp_game_start &&
+      row.response.game_data.level > d3.select('#minLevel').property('valueAsNumber');
   });
   logTiming('filter', start);
   displayData(data);
