@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Steam Monster Game: Final Stats</title>
+<link href='https://fonts.googleapis.com/css?family=Roboto:400,700' rel='stylesheet' type='text/css'>
+<link href='https://fonts.googleapis.com/css?family=Droid+Sans+Mono' rel='stylesheet' type='text/css'>
+<script src='https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.5/d3.min.js' charset='utf-8'></script>
+<style>
+body {
+  display: flex;
+  font-family: Roboto, sans-serif;
+  margin: 0;
+  padding: 0;
+}
+#container {
+  margin: 20px auto;
+  width: 860px;
+}
+a:link { color: #4d70db; }
+a:visited { color: #666699; }
+table {
+  table-layout: fixed;
+  width: 100%;
+}
+tr:nth-child(even) { background: #CCC; }
+tr:nth-child(odd) { background: #FFF; }
+th, td {
+  padding: 3px 12px;
+  text-align: right;
+  vertical-align: bottom;
+}
+td:nth-child(1),td:nth-child(2), td:nth-child(3) { text-align: center; }
+td { font-family: 'Droid Sans Mono', monospace; }
+th {
+  background: #cd6a51;
+  color: white;
+  text-align: center;
+}
+th:nth-child(1) {
+  width: 3ch;
+}
+th:nth-child(2) {
+  width: 7ch;
+}
+th:nth-child(3) {
+  width: 7ch;
+}
+th:nth-child(4) {
+  width: 13.5ch;
+}
+th:nth-child(5) {
+  width: 8ch;
+}
+th:nth-child(6) {
+  width: 8ch;
+}
+</style>
+<script>
+var startDate = new Date('2015-06-12T09:00-07:00') / 1000;
+
+function logTiming(context, start) {
+  console.log(context + ' took ' + (Date.now() - start) + 'ms');
+}
+
+var originalData;
+
+function load() {
+  var table = d3.select('#container').append('table');
+  var thead = table.append('thead');
+  var tbody = table.append('tbody');
+
+  var ths = thead.append('tr')
+    .selectAll('th')
+    .data([
+      'Day',
+      'Starting Time',
+      'Game ID',
+      'Level',
+      'Boss Levels',
+      'Normal Levels',
+      'Wormhole Percent',
+      'Normal : Boss Level Ratio',
+    ])
+    .enter()
+    .append('th')
+    .text(function (d) { return d; })
+    .on('click', function(d, i) {
+      if (i != sortColumn) {
+        sortColumn = i;
+        sortDirection = -1;
+      } else {
+        sortDirection *= -1;
+      }
+      resort(d3.select('tbody').selectAll('tr'));
+    });
+
+  fetchData();
+}
+
+function fetchData() {
+  var xhr = new XMLHttpRequest();
+  xhr.addEventListener('progress', updateProgress);
+  xhr.addEventListener('load', function () {
+    if (xhr.response) {
+      d3.select('#status').text('Click on a column header to sort by that column.');
+      originalData = xhr.response;
+      filterData();
+    }
+  });
+  xhr.addEventListener('abort', failed);
+  xhr.addEventListener('error', failed);
+  xhr.open('get', 'https://raw.githubusercontent.com/zetafunction/steam-monster-game/sweeper/proto2json/games.json', true);
+  xhr.responseType = 'json';
+  xhr.send();
+}
+
+function updateProgress(e) {
+  var loadFraction = e.loaded;
+  if (e.lengthComputable) {
+    loadFraction /= e.total;
+  } else {
+    // Cheat if the server didn't send a Content-Length header.
+    loadFraction /= 18674802;
+  }
+  d3.select('#status').text('Loading data (' + Math.round(loadFraction * 100) + '%)\u2026');
+}
+
+function filterData() {
+  var start = Date.now();
+  var data = originalData.filter(function(row) {
+    return row.response.game_data.level > d3.select('#minLevel').property('valueAsNumber');
+  });
+  logTiming('filter', start);
+  displayData(data);
+}
+
+function pad2(n) {
+  if (n < 10) return '0' + n;
+  return '' + n;
+}
+
+function durationToString(seconds) {
+  var hours = Math.floor(seconds / 3600);
+  seconds %= 3600;
+  var minutes = Math.floor(seconds / 60);
+  seconds %= 60;
+  return '+' + pad2(hours) + ':' + pad2(minutes);
+}
+
+function displayData(data) {
+  var start = Date.now();
+
+  data = data.map(function(row) {
+    var total_levels = row.response.game_data.level;
+    var boss_levels = row.response.stats.num_bosses_killed;
+    var normal_levels = Math.floor(row.response.stats.num_towers_killed / 3);
+    var wormholed_levels = row.response.game_data.level - boss_levels - normal_levels;
+    var normal_to_boss_ratio = normal_levels / boss_levels;
+    // This can happen if a level wasn't entirely cleared after the boss/spawners were killed.
+    if (wormholed_levels < 0)
+      wormholed_levels = 0;
+    return [
+      row.response.game_data.timestamp_game_start,
+      row.response.game_data.timestamp_game_start,
+      row.id,
+      row.response.game_data.level,
+      boss_levels,
+      normal_levels,
+      total_levels != 0 ? wormholed_levels / total_levels * 100 : 0,
+      normal_to_boss_ratio,
+    ];
+  });
+
+  var rows = d3.select('tbody').selectAll('tr')
+    .data(data, function (d) { return d[2]; });
+
+  rows.enter()
+    .append('tr');
+
+  rows.exit()
+    .remove();
+
+  var cells = rows.selectAll('td')
+    .data(function(d) { return d; })
+
+  cells.enter()
+    .append('td')
+    .text(function(d, i) {
+      if (i == 0)
+        return Math.floor((d - startDate) / 86400) + 1;
+      if (i == 1) {
+        // Valve did some testing prior to the event, so pad the duration to prevent this
+        // number from being negative.
+        var duration = d - startDate + 86400 * 10;
+        return durationToString(duration % 86400);
+      }
+      if (i == 2)
+        return d;
+      if (i == 6)
+        return d.toFixed(5) + '%';
+      if (i == 7)
+        return d.toFixed(2);
+      return d.toLocaleString();
+    });
+
+  logTiming('display', start);
+
+  resort(rows);
+}
+
+// Sort by level initially.
+var sortColumn = 3;
+var sortDirection = -1;
+function resort(rows) {
+  var start = Date.now();
+  rows.sort(function (a, b) {
+    if (a[sortColumn] != b[sortColumn])
+      return sortDirection * (a[sortColumn] - b[sortColumn]);
+    // Otherwise, ties are broken by level, wormhole %, start time, and finally, game ID.
+    if (a[3] != b[3])
+      return b[3] - a[3];
+    if (a[6] != b[6])
+      return b[6] - a[6];
+    if (a[0] != b[0])
+      return b[0] - a[0];
+    return a[2] - b[2];
+  });
+
+  logTiming('sort', start);
+}
+
+function failed() {
+  d3.select('#status').text('Load failed! Automatically retrying in a minute...');
+  window.setTimeout(fetchData, 60 * 1000);
+}
+</script>
+</head>
+<body onload="load()">
+<div id="container">
+<h2>Steam Monster Game: Final Stats</h2>
+<p id="status">Loading...</p>
+<p>Raw data is available on GitHub in <a href="https://github.com/zetafunction/steam-monster-game/tree/sweeper/proto2json">JSON</a> or <a href="https://github.com/zetafunction/steam-monster-game/tree/sweeper/sweeper/data">protobuf</a> format.</p>
+<p>Minimum level: <input id="minLevel" type="number" min="0" value="1000"><button onclick="filterData()">Apply</button></p>
+</div>
+</body>
+</html>
